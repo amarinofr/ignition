@@ -4,10 +4,22 @@ import "core:fmt"
 import "core:math"
 import rl "vendor:raylib"
 
+Direction :: enum {
+	NORTH,
+	SOUTH,
+	EAST,
+	WEST,
+}
+
+Physics :: struct {
+	force, accel, mass, speed: f32,
+	pos, vel, size:            Vec3,
+}
+
 Entity :: struct {
-	pos, vel, size:      Vec3,
-	speed, accel, brake: f32,
-	color:               rl.Color,
+	using physics: Physics,
+	is_running:    bool,
+	color:         rl.Color,
 }
 
 GameState :: struct {
@@ -55,43 +67,30 @@ main :: proc() {
 input :: proc() {
 	input_auto_switch()
 
-	gs.input.left = false
-	gs.input.right = false
-	gs.input.accel = false
-	gs.input.back = false
+	gs.input.turn_left = false
+	gs.input.turn_right = false
+	gs.input.go_forward = false
+	gs.input.go_back = false
 	gs.input.brake = false
+	gs.player.is_running = false
 
 	//
-	//  TODO: This can definitely be simplified.
+	//  TODO: Come up with a way where I can define dynamically the
+	// 		  keys, buttons and axes. Probably an array with the controls
+	// 		  and then iterating through it to get the corresponding value?
 	//
 	#partial switch gs.input_src {
 	case .KEYBOARD:
-		gs.player.accel = 0.03
-		gs.player.brake = 0.09
-
-		if rl.IsKeyDown(.A) do gs.input.left = true
-		if rl.IsKeyDown(.D) do gs.input.right = true
-		if rl.IsKeyDown(.W) do gs.input.accel = true
-		if rl.IsKeyDown(.S) do gs.input.back = true
+		if rl.IsKeyDown(.A) do gs.input.turn_left = true
+		if rl.IsKeyDown(.D) do gs.input.turn_right = true
+		if rl.IsKeyDown(.W) do gs.input.go_forward = true
+		if rl.IsKeyDown(.S) do gs.input.go_back = true
 		if rl.IsKeyDown(.SPACE) do gs.input.brake = true
 	case .GAMEPAD:
-		gs.player.accel =
-			rl.GetGamepadAxisMovement(gs.input.gamepad_id, .RIGHT_TRIGGER) * gs.input.sensitivity
-		gs.player.brake =
-			rl.GetGamepadAxisMovement(gs.input.gamepad_id, .LEFT_TRIGGER) * gs.input.sensitivity
-
-		if rl.GetGamepadAxisMovement(gs.input.gamepad_id, .LEFT_X) < -gs.input.joy_deadzone {
-			gs.input.left = true
-		}
-		if rl.GetGamepadAxisMovement(gs.input.gamepad_id, .LEFT_X) > gs.input.joy_deadzone {
-			gs.input.right = true
-		}
-		if rl.GetGamepadAxisMovement(gs.input.gamepad_id, .RIGHT_TRIGGER) > gs.input.trg_deadzone {
-			gs.input.accel = true
-		}
-		if rl.GetGamepadAxisMovement(gs.input.gamepad_id, .LEFT_TRIGGER) > gs.input.trg_deadzone {
-			gs.input.back = true
-		}
+		if rl.GetGamepadAxisMovement(gs.input.gamepad_id, .LEFT_X) < -gs.input.joy_deadzone do gs.input.turn_left = true
+		if rl.GetGamepadAxisMovement(gs.input.gamepad_id, .LEFT_X) > gs.input.joy_deadzone do gs.input.turn_left = true
+		if rl.GetGamepadAxisMovement(gs.input.gamepad_id, .RIGHT_TRIGGER) > gs.input.trg_deadzone do gs.input.go_forward = true
+		if rl.GetGamepadAxisMovement(gs.input.gamepad_id, .LEFT_TRIGGER) > gs.input.trg_deadzone do gs.input.go_back = true
 	}
 }
 
@@ -99,24 +98,6 @@ update :: proc() {
 	gs.camera.target = gs.player.pos
 	gs.camera.position.x = gs.player.pos.x
 	gs.camera.position.z = 10 + gs.player.pos.z
-
-
-	//
-	// NOTE: This is working but can 100% be better. Think about it.
-	//
-	if gs.input.accel {
-		gs.player.vel.z -= gs.player.accel * rl.GetFrameTime()
-		gs.player.pos.z = gs.player.pos.z + gs.player.vel.z
-	} else {
-		gs.player.vel.z -= lerp(gs.player.vel.z, 0, 0.1)
-		gs.player.pos.z = gs.player.pos.z + gs.player.vel.z
-	}
-
-	gs.player.vel.z = clamp(gs.player.vel.z, -0.2, 0.2)
-
-	fmt.printfln("speed: %f", gs.player.vel.z)
-
-
 }
 
 render :: proc() {

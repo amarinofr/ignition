@@ -10,14 +10,16 @@ Input_Source :: enum {
 }
 
 Input :: struct {
-	gamepad_id:                              i32,
-	joy_deadzone, trg_deadzone, sensitivity: f32,
-	left, right, accel, back, brake:         bool,
+	turn_left, turn_right, go_forward, go_back, brake: bool,
+	joy_deadzone, trg_deadzone, sensitivity:           f32,
+	gamepad_id:                                        i32,
 }
 
-input_auto_switch :: #force_inline proc() {
+
+input_auto_switch :: proc() {
 	//
-	//  NOTE: Is there even a need for auto switch in a driving game?
+	//  NOTE: I need to create in the future the ability to choose which controller
+	// 		   and if there's auto switching or not.
 	//
 
 	if rl.GetKeyPressed() != .KEY_NULL {
@@ -30,16 +32,3 @@ input_auto_switch :: #force_inline proc() {
 		}
 	}
 }
-
-//
-//  NOTE: This is cool and all, but does it serve any purpose for this game?
-//
-// gamepad_moving :: proc(stick: f32) -> bool {
-// 	if !(stick < -gs.input.joy_deadzone) && !(stick > gs.input.joy_deadzone) {
-// 		return false
-// 	}
-
-// 	fmt.printfln("axis moving: %s", stick)
-
-// 	return true
-// }
