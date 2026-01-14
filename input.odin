@@ -15,11 +15,25 @@ Input :: struct {
 	gamepad_id:                                        i32,
 }
 
+keyboard_controls :: proc() {
+	if rl.IsKeyDown(.A) do gs.input.turn_left = true
+	if rl.IsKeyDown(.D) do gs.input.turn_right = true
+	if rl.IsKeyDown(.W) do gs.input.go_forward = true
+	if rl.IsKeyDown(.S) do gs.input.go_back = true
+	if rl.IsKeyDown(.SPACE) do gs.input.brake = true
+}
+
+gamepad_controls :: proc() {
+	if rl.GetGamepadAxisMovement(gs.input.gamepad_id, .LEFT_X) < -gs.input.joy_deadzone do gs.input.turn_left = true
+	if rl.GetGamepadAxisMovement(gs.input.gamepad_id, .LEFT_X) > gs.input.joy_deadzone do gs.input.turn_right = true
+	if rl.GetGamepadAxisMovement(gs.input.gamepad_id, .RIGHT_TRIGGER) > gs.input.trg_deadzone do gs.input.go_forward = true
+	if rl.GetGamepadAxisMovement(gs.input.gamepad_id, .LEFT_TRIGGER) > gs.input.trg_deadzone do gs.input.go_back = true
+}
+
 
 input_auto_switch :: proc() {
 	//
-	//  NOTE: I need to create in the future the ability to choose which controller
-	// 		   and if there's auto switching or not.
+	//  NOTE: Need to create option to change&lock input type
 	//
 
 	if rl.GetKeyPressed() != .KEY_NULL {
