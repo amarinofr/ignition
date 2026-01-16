@@ -1,27 +1,22 @@
 package main
 
 import "core:fmt"
+import "core:strings"
+import "core:time"
 import rl "vendor:raylib"
-
-Direction :: enum {
-	NORTH,
-	SOUTH,
-	EAST,
-	WEST,
-}
 
 Physics :: struct {
 	accel, top_speed, steering_angle: f32,
-	pos, vel, size:                   Vec3,
-	rotation:                         Matrix,
-}
-
-Entity :: struct {
-	using physics: Physics,
-	color:         rl.Color,
+	pos, vel, scale:                  Vec3,
+	rotation:                         Vec3,
 }
 
 GameState :: struct {
+	time:      struct {
+		delta:      f32,
+		session:    f64,
+		frame, fps: int,
+	},
 	screen:    [2]i32,
 	camera:    rl.Camera3D,
 	input_src: Input_Source,
@@ -31,56 +26,49 @@ GameState :: struct {
 
 gs: ^GameState
 
+load_model :: proc(file: cstring) -> rl.Model {
+	model := rl.LoadModel(file)
+
+	return model
+}
+
 main :: proc() {
 	gs = new(GameState)
 
 	gs.screen.x = 1280
 	gs.screen.y = 720
 
+	setup_player()
+
 	rl.InitWindow(gs.screen.x, gs.screen.y, "Ignition")
+	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
 
-	gs.input.joy_deadzone = 0.005
-	gs.input.trg_deadzone = 0.000001
-	gs.input.sensitivity = 0.1
-
-	gs.player.color = rl.GREEN
-	gs.player.size = {1, 0.5, 1.65}
-	gs.player.pos.y = 0.25
-	gs.player.accel = 5
-	gs.player.top_speed = 25
-	gs.player.steering_angle = 0.15
-
-	gs.camera.position = {0, 10, 0}
-	gs.camera.target = {0, 0, 0}
-	gs.camera.up = {0, 1, 0}
-	gs.camera.fovy = 45
-	gs.camera.projection = .PERSPECTIVE
+	gs.player.model = load_model("./assets/Car.glb")
 
 	for !rl.WindowShouldClose() {
 		input()
 		update()
 		render()
 	}
-
-	rl.CloseWindow()
 }
 
 input :: proc() {
 	input_auto_switch()
 
-	// gs.player.vel.z = lerp(gs.player.vel.z, 0, gs.player.accel * 3)
-	gs.input.turn_left = false
-	gs.input.turn_right = false
+	gs.player.flags = {.STOPPING, .BRAKING}
 	gs.input.go_forward = false
 	gs.input.go_back = false
+	gs.input.turn_left = false
+	gs.input.turn_right = false
 	gs.input.brake = false
 
 	//
-	//  TODO: Come up with a way where I can define dynamically the
+	//  @TODO: Come up with a way where I can define dynamically the
 	// 		  keys, buttons and axes. Probably an array with the controls
 	// 		  and then iterating through it to get the corresponding value?
 	//
+
 	#partial switch gs.input_src {
 	case .KEYBOARD:
 		keyboard_controls()
@@ -89,59 +77,95 @@ input :: proc() {
 	}
 
 	if gs.input.go_forward {
-		gs.player.vel.z += gs.player.accel * rl.GetFrameTime()
+		gs.player.flags = {.MOVING, .MOVING_FORWARD}
 	}
 	if gs.input.go_back {
-		gs.player.vel.z -= gs.player.accel * rl.GetFrameTime()
+		gs.player.flags = {.MOVING, .MOVING_BACKWARD}
+	}
+	if gs.input.turn_left {
+		gs.player.flags += {.TURNING, .TURNING_LEFT}
+	}
+	if gs.input.turn_right {
+		gs.player.flags += {.TURNING, .TURNING_RIGHT}
 	}
 	if gs.input.brake {
-		gs.player.vel.z -= (gs.player.accel * 4) * rl.GetFrameTime()
-	}
-
-	if gs.input.turn_left {
-		// gs.player.rotation.z += gs.player.steering_angle
+		gs.player.flags = {.STOPPING, .BRAKING}
+		fmt.println("BRAKING")
 	}
 }
 
 update :: proc() {
-	if gs.input.brake {
-		gs.player.vel.z = clamp(gs.player.vel.z, 0, gs.player.top_speed)
-	} else {
-		gs.player.vel.z = clamp(gs.player.vel.z, -gs.player.top_speed / 4, gs.player.top_speed)
+	time_update()
+
+	// if gs.player.flags == {} {
+	// 	gs.player.flags = {.STOPPING, .BRAKING}
+	// }
+
+	if .MOVING in gs.player.flags {
+		gs.player.vel.z = clamp(gs.player.vel.z, -gs.player.top_speed, gs.player.top_speed / 4)
+
+		if .MOVING_FORWARD in gs.player.flags {
+			gs.player.vel.z -= gs.player.accel * gs.time.delta
+		}
+
+		if .MOVING_BACKWARD in gs.player.flags {
+			gs.player.vel.z += gs.player.accel * gs.time.delta
+		}
 	}
 
-	gs.player.pos.z += gs.player.vel.z * rl.GetFrameTime()
+	if .TURNING in gs.player.flags {
+		if .TURNING_LEFT in gs.player.flags {
+			gs.player.rotation.x += 45 * gs.time.delta
+		}
 
-	fmt.printfln("VEL Z: %f", gs.player.vel.z)
-	fmt.printfln("POS Z: %f", gs.player.pos.z)
+		if .TURNING_RIGHT in gs.player.flags {
 
-	gs.camera.position.z = gs.player.pos.z - 10
+		}
+	}
+
+	if .BRAKING in gs.player.flags {
+		gs.player.vel.z = lerp(gs.player.vel.z, 0, (gs.player.accel * 0.001))
+
+		if !(gs.player.vel.z < -0.5) && !(gs.player.vel.z > 0.5) {
+			gs.player.flags = {.STATIC}
+		}
+	}
+
+	if .STATIC in gs.player.flags {
+		gs.player.vel.z = 0
+	}
+
+
+	gs.camera.position.z = 10 + gs.player.pos.z
+	gs.camera.position.y = lerp(
+		gs.camera.position.y,
+		16 - abs(gs.player.vel.z * 0.5),
+		gs.player.accel * 0.001,
+	)
+	gs.camera.position.y = clamp(gs.camera.position.y, 8, 10)
+	// gs.camera.position.z = clamp(gs.camera.position.y, 5, 10)
+
 	gs.camera.target = gs.player.pos
 
+	gs.player.pos.z += gs.player.vel.z * gs.time.delta
+	gs.player.rotation.z += gs.player.steering_angle
 }
 
 render :: proc() {
 	rl.BeginDrawing()
 	rl.ClearBackground(rl.RAYWHITE)
-
 	rl.BeginMode3D(gs.camera)
 
-	rl.DrawGrid(1000, 0.5)
-	rl.DrawCubeV(gs.player.pos, gs.player.size, gs.player.color)
+	draw_scene()
+
 	rl.EndMode3D()
 
+	// for flag in gs.player.flags {
+	rl.DrawText(fmt.ctprint(gs.player.flags), 20, 20, 20, rl.BLACK)
+	// }
 
-	if gs.input.go_forward {
-		rl.DrawText("Forward", 20, 50, 18, rl.BLUE)
-	}
-	if gs.input.go_back {
-		rl.DrawText("Back", 20, 50, 18, rl.BLUE)
-	}
-	if gs.input.brake {
-		rl.DrawText("BRAKING", 20, 50, 18, rl.BLUE)
-	}
-
-	rl.DrawText(fmt.ctprintf("INPUT: %s", gs.input_src), 20, 20, 14, rl.RED)
+	rl.DrawText(fmt.caprintf("SPEED: %f", gs.player.vel.z), 1100, 20, 20, rl.BLACK)
+	rl.DrawText(fmt.ctprintf("INPUT: %s", gs.input_src), 20, 680, 14, rl.RED)
 
 	rl.DrawFPS(700, 760)
 	rl.EndDrawing()
