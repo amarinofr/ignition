@@ -10,6 +10,13 @@ Scene :: enum {
 }
 
 draw_scene :: proc() {
-	rl.DrawModelEx(gs.player.model, gs.player.pos, gs.player.rotation, 0, gs.player.scale, rl.RED)
+	rl.DrawModelEx(
+		gs.player.model,
+		gs.player.pos,
+		{0, 1, 0},
+		gs.player.rotation_angle,
+		gs.player.scale,
+		rl.RED,
+	)
 	rl.DrawGrid(1000, 0.5)
 }

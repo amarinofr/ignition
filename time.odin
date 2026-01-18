@@ -10,13 +10,9 @@ time_update :: #force_inline proc() {
 	gs.time.fps = int(rl.GetFPS())
 }
 
-// lerp :: proc(curr, dest: f32, duration: f64) -> f32 {
-// 	t := f32(gs.time.session / duration)
-// 	x := curr + (dest - curr) * t
+lerp :: proc(curr, dest: f32, duration: f64) -> f32 {
+	t := f32(gs.time.session / duration)
+	x := curr + (dest - curr) * t
 
-// 	return x
-// }
-
-lerp :: proc(curr, dest: f32, duration: f32) -> f32 {
-	return curr + (dest - curr) * gs.time.delta
+	return x
 }

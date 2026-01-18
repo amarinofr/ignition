@@ -7,11 +7,7 @@ Entity_ID :: distinct u64
 Entity_Flags :: enum {
 	STATIC,
 	MOVING,
-	MOVING_FORWARD,
-	MOVING_BACKWARD,
 	TURNING,
-	TURNING_LEFT,
-	TURNING_RIGHT,
 	STOPPING,
 	BRAKING,
 }
@@ -24,12 +20,13 @@ Entity_Type :: enum {
 }
 
 Entity :: struct {
-	ID:            Entity_ID,
-	using physics: Physics,
-	type:          bit_set[Entity_Type],
-	model:         rl.Model,
-	flags:         bit_set[Entity_Flags],
-	color:         rl.Color,
+	ID:                                                                Entity_ID,
+	using physics:                                                     Physics,
+	accel, brake, top_speed, bottom_speed, turn_angle, rotation_angle: f32,
+	type:                                                              bit_set[Entity_Type],
+	model:                                                             rl.Model,
+	flags:                                                             bit_set[Entity_Flags],
+	color:                                                             rl.Color,
 }
 
 
@@ -42,8 +39,10 @@ setup_player :: proc() {
 	gs.player.scale = {0.5, 0.5, 0.5}
 	// gs.player.pos.y = 0.25
 	gs.player.accel = 5
-	gs.player.top_speed = 25
-	gs.player.steering_angle = 0.15
+	gs.player.brake = 20
+	gs.player.top_speed = 5
+	gs.player.bottom_speed = 2
+	gs.player.turn_angle = 45
 
 	gs.camera.position = {0, 10, 0}
 	gs.camera.target = {0, 0, 0}
